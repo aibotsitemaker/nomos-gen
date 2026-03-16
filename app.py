@@ -10,7 +10,7 @@ else:
 
 st.set_page_config(page_title="Qanun-AI - Rəsmi Portal", layout="wide")
 
-# CSS (Streamlit-i peşəkar portala çevirmək üçün)
+# CSS
 st.markdown("""
     <style>
     header, footer, #MainMenu, .stDeployButton {visibility: hidden;}
@@ -24,10 +24,7 @@ st.markdown("""
         box-shadow: 0 10px 25px rgba(0,0,0,0.05); min-height: 550px;
         color: black !important; font-family: 'Times New Roman', serif;
     }
-    /* Qaranlıq rejim xətalarını önləmək üçün məcburi rənglər */
-    input, textarea, div[data-baseweb="select"] > div {
-        background-color: #f8f9fa !important; color: black !important;
-    }
+    input, textarea { background-color: #f8f9fa !important; color: black !important; border: 1px solid #d1d5db !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -38,20 +35,28 @@ col1, col2 = st.columns([1, 1.2], gap="large")
 with col1:
     st.markdown("### **Sənəd Parametrləri**")
     doc_type = st.selectbox("Sənədin növü", ["İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "İzahata", "Təqdimat", "Müqavilə"])
-    ad = st.text_input("Tam Adınız", placeholder="Məs: Əli Əlizadə")
-    vezife = st.text_input("Vəzifəniz", placeholder="Məs: Mühəndis")
-    muesise = st.text_input("Müəssisə", placeholder="Məs: Aztelekom MMC")
-    rehber = st.text_input("Rəhbər (Vəzifə və Ad)", placeholder="Məs: Direktor Rəşad Dostuyev")
+    ad = st.text_input("Tam Adınız", value="Əli Əlizadə")
+    vezife = st.text_input("Vəzifəniz", value="Mühəndis")
+    muesise = st.text_input("Müəssisə", value="Aztelekom MMC")
+    rehber = st.text_input("Rəhbər", value="Direktor Rəşad Dostuyev")
     detal = st.text_area("Məzmun", placeholder="Məs: Toyumla bağlı 10 günlük məzuniyyət...")
     tarix = st.date_input("Tarix", date.today())
-    
     hazirla = st.button("✨ Süni İntellektlə Hazırla")
 
 with col2:
-    if hazirla and ad and muesise:
+    if hazirla:
         try:
-            model = genai.GenerativeModel('gemini-pro')
-            prompt = f"Azərbaycan dilində, rəsmi kargüzarlıq üslubunda {doc_type} üçün əsas mətn hissəsi yaz. Mövzu: {detal}. Şəxs: {ad}, Vəzifə: {vezife}. Yalnız əsas mətni qaytar."
+            # Ən stabil modeli birbaşa çağıraq
+            model = genai.GenerativeModel('models/gemini-1.5-flash')
+            
+            prompt = f"""
+            Sən Azərbaycanın rəsmi kargüzarlıq qaydalarını bilən hüquq köməkçisisən.
+            Aşağıdakı məlumatlara əsasən çox ciddi və rəsmi dildə {doc_type} mətni hazırla:
+            Mövzu: {detal}
+            Şəxs: {ad}
+            Vəzifə: {vezife}
+            Yalnız sənədin əsas hissəsini qaytar, giriş və sonluq (Hörmətlə və s.) olmasın.
+            """
             
             response = model.generate_content(prompt)
             
@@ -62,7 +67,12 @@ with col2:
             st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{response.text}</p>", unsafe_allow_html=True)
             st.markdown(f"<br><br><p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+            
         except Exception as e:
-            st.error(f"Sistem xətası: {e}")
-    else:
-        st.info("Məlumatları daxil edin və düyməni sıxın.")
+            # Əgər yenə 404 versə, modeli fərqli formatda yoxlayaq
+            try:
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
+                st.success("Alternativ model ilə hazırlandı!")
+            except:
+                st.error(f"AI Modelə qoşulmaq alınmadı. Lütfən API Key-in aktivliyini yoxlayın. Xəta: {e}")
