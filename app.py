@@ -1,108 +1,88 @@
 import streamlit as st
 from datetime import date
 import google.generativeai as genai
-from fpdf import FPDF
+from io import BytesIO
+from xhtml2pdf import pisa
 
-# Azərbaycan hərflərini PDF-in başa düşəcəyi formata salmaq üçün funksiya
-def fix_az_chars(text):
-    rep = {
-        "ə": "e", "ə": "e", "sh": "sh", "s": "s", "i": "i", "g": "g", "o": "o", "u": "u", "c": "c",
-        "Ə": "E", "Ş": "S", "İ": "I", "Ğ": "G", "Ö": "O", "Ü": "U", "Ç": "C"
-    }
-    for search, replace in rep.items():
-        text = text.replace(search, replace)
-    return text
-
-def create_pdf(muesise, rehber, vezife, ad, doc_type, content, tarix):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    
-    # Məlumatları təmizləyirik (Unicode xətası almamamaq üçün)
-    muesise = fix_az_chars(muesise)
-    rehber = fix_az_chars(rehber)
-    vezife = fix_az_chars(vezife)
-    ad = fix_az_chars(ad)
-    content = fix_az_chars(content)
-    
-    # Sağ tərəf
-    pdf.cell(0, 10, f"{muesise} {rehber}ne", ln=True, align='R')
-    pdf.cell(0, 10, f"{vezife} {ad} terefinden", ln=True, align='R')
-    
-    # Başlıq
-    pdf.ln(20)
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, doc_type.upper(), ln=True, align='C')
-    
-    # Mətn
-    pdf.ln(10)
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, content)
-    
-    # Sonluq
-    pdf.ln(30)
-    pdf.cell(100, 10, f"Tarix: {tarix}", align='L')
-    pdf.cell(0, 10, "Imza: ________________", align='R')
-    
-    return pdf.output(dest='S').encode('latin-1', 'ignore')
+# PDF Hazırlama Funksiyası (Azərbaycan şriftləri üçün)
+def create_pdf(html_content):
+    result = BytesIO()
+    pdf = pisa.pisaDocument(BytesIO(html_content.encode("UTF-8")), result)
+    if not pdf.err:
+        return result.getvalue()
+    return None
 
 st.set_page_config(page_title="Qanun-AI - Rəsmi Portal", layout="wide")
 
-# Reklam və Dizayn Stilləri
+# CSS və Dizayn
 st.markdown("""
     <style>
     header, footer, #MainMenu, .stDeployButton {visibility: hidden;}
     .ad-slot {
-        background-color: #f1f3f4; border: 1px solid #d1d5db;
+        background-color: #f8f9fa; border: 1px dashed #1a2a40;
         text-align: center; padding: 15px; margin: 15px 0;
-        color: #5f6368; font-weight: bold; border-radius: 8px;
+        color: #6c757d; font-size: 14px; border-radius: 5px;
     }
     .paper-preview {
         background-color: white !important; padding: 40px; border: 1px solid #e5e7eb;
-        color: black !important; font-family: 'Times New Roman', serif;
+        color: black !important; font-family: 'DejaVu Sans', sans-serif;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # 1. YUXARI REKLAM
-st.markdown('<div class="ad-slot">GOOGLE ADS - TOP BANNER (Horizontal)</div>', unsafe_allow_html=True)
+st.markdown('<div class="ad-slot">GOOGLE ADS - YUXARI BANNER</div>', unsafe_allow_html=True)
 
-st.title("Qanun-AI - Sənəd Portalı")
+st.title("Qanun-AI - Rəsmi Sənəd Portalı")
 
 col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
-    st.markdown("### **Sənəd Məlumatları**")
+    st.markdown("### **Sənəd Parametrləri**")
     doc_type = st.selectbox("Sənəd növü", ["İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "İzahata", "Arayış"])
-    ad = st.text_input("Adınız", value="Əli Əlizadə")
+    ad = st.text_input("Tam Adınız", value="Əli Əlizadə")
     vezife = st.text_input("Vəzifəniz", value="Mühəndis")
     muesise = st.text_input("Müəssisə", value="Aztelekom MMC")
-    rehber = st.text_input("Rəhbər Vəzifəsi", value="Direktor")
-    detal = st.text_area("Məzmun", placeholder="Qısa səbəb yazın...")
+    rehber = st.text_input("Rəhbər Vəzifəsi və Adı", value="Direktor Rəşad Dostuyev")
+    detal = st.text_area("Məzmun (Səbəb)", placeholder="Məs: Şəxsi işlərimlə əlaqədar...")
     tarix = st.date_input("Tarix", date.today())
     
-    # 2. ORTA REKLAM (Sidebar/İnput altı)
-    st.markdown('<div class="ad-slot">GOOGLE ADS - MIDDLE SQUARE</div>', unsafe_allow_html=True)
+    # 2. ORTA REKLAM
+    st.markdown('<div class="ad-slot">GOOGLE ADS - ORTA REKLAM</div>', unsafe_allow_html=True)
     
-    hazirla = st.button("✨ Hazırla və PDF-ə Çevir")
+    hazirla = st.button("✨ Sənədi Hazırla")
 
 with col2:
     if hazirla:
-        content = f"Xahis edirem, {detal} ile elaqedar {doc_type} qebul edesiniz."
+        # Rəsmi Azərbaycan dilində mətn
+        ai_content = f"Məlumat üçün bildirirəm ki, {detal} ilə əlaqədar olaraq {doc_type.lower()} ilə bağlı müraciət edirəm. Xahiş edirəm bu barədə müvafiq göstəriş verəsiniz."
         
+        # Sənədin HTML formatı (PDF-ə bu formatda köçəcək)
+        html_template = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: black;">
+            <div style="text-align: right; font-weight: bold;">{muesise} {rehber}nə</div>
+            <div style="text-align: right;">{vezife} {ad} tərəfindən</div>
+            <br><br>
+            <h2 style="text-align: center;">{doc_type.upper()}</h2>
+            <br>
+            <p style="text-indent: 40px; text-align: justify;">{ai_content}</p>
+            <br><br><br>
+            <div style="display: flex; justify-content: space-between;">
+                <span>Tarix: {tarix}</span>
+                <span style="float: right;">İmza: ________________</span>
+            </div>
+        </div>
+        """
+        
+        # Ekranda göstər
         st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
-        st.write(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
-        st.write(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
-        st.write(f"<h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
-        st.write(f"<p style='text-indent:50px;'>{content}</p>", unsafe_allow_html=True)
-        st.write(f"<br><p>Tarix: {tarix} <span style='float:right;'>İmza: ________________</span></p>", unsafe_allow_html=True)
+        st.markdown(html_template, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        try:
-            pdf_data = create_pdf(muesise, rehber, vezife, ad, doc_type, content, tarix)
-            st.download_button("📥 PDF-i Yüklə", data=pdf_data, file_name="sened.pdf", mime="application/pdf")
-        except Exception as e:
-            st.error(f"PDF xətası: {e}")
+        # PDF Yükləmə
+        pdf_file = create_pdf(html_template)
+        if pdf_file:
+            st.download_button(label="📥 Azərbaycan dilində PDF yüklə", data=pdf_file, file_name=f"{doc_type}.pdf", mime="application/pdf")
 
 # 3. AŞAĞI REKLAM
-st.markdown('<div class="ad-slot">GOOGLE ADS - BOTTOM FOOTER (Long)</div>', unsafe_allow_html=True)
+st.markdown('<div class="ad-slot">GOOGLE ADS - AŞAĞI REKLAM</div>', unsafe_allow_html=True)
