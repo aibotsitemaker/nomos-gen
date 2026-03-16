@@ -2,16 +2,15 @@ import streamlit as st
 import google.generativeai as genai
 from datetime import date
 
-# Streamlit Secrets-dən API Key-i götürürük
-try:
+# API Key Tənzimləməsi
+if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-except:
-    st.error("API Key tapılmadı. Secrets bölməsini yoxlayın!")
+else:
+    st.error("API Key tapılmadı! Lütfən Secrets bölməsini yoxlayın.")
 
-# Səhifə tənzimləmələri
-st.set_page_config(page_title="Qanun-AI - Universal Generator", layout="wide")
+st.set_page_config(page_title="Qanun-AI - Rəsmi Portal", layout="wide")
 
-# CSS (Gizli Streamlit elementləri və Rəsmi Stil)
+# CSS (Streamlit-i peşəkar portala çevirmək üçün)
 st.markdown("""
     <style>
     header, footer, #MainMenu, .stDeployButton {visibility: hidden;}
@@ -25,6 +24,10 @@ st.markdown("""
         box-shadow: 0 10px 25px rgba(0,0,0,0.05); min-height: 550px;
         color: black !important; font-family: 'Times New Roman', serif;
     }
+    /* Qaranlıq rejim xətalarını önləmək üçün məcburi rənglər */
+    input, textarea, div[data-baseweb="select"] > div {
+        background-color: #f8f9fa !important; color: black !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -34,54 +37,32 @@ col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
     st.markdown("### **Sənəd Parametrləri**")
-    
-    doc_type = st.selectbox("Sənədin növü", [
-        "İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "Ödənişsiz Məzuniyyət Ərizəsi",
-        "İzahata", "Təqdimat", "Arayış", "Müqavilə", "Xüsusi Sənəd"
-    ])
-    
-    ad = st.text_input("Sizin Tam Adınız")
-    vezife = st.text_input("Vəzifəniz")
-    muesise = st.text_input("Müəssisə / Şirkət")
-    rehber = st.text_input("Rəhbərin Vəzifəsi və Adı")
-    detal = st.text_area("Sənədin qısa məzmunu (AI bunu rəsmiləşdirəcək)", placeholder="Məs: Ailə vəziyyəti ilə bağlı 3 günlük icazə...")
-    tarix = st.date_input("Sənəd Tarixi", date.today())
+    doc_type = st.selectbox("Sənədin növü", ["İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "İzahata", "Təqdimat", "Müqavilə"])
+    ad = st.text_input("Tam Adınız", placeholder="Məs: Əli Əlizadə")
+    vezife = st.text_input("Vəzifəniz", placeholder="Məs: Mühəndis")
+    muesise = st.text_input("Müəssisə", placeholder="Məs: Aztelekom MMC")
+    rehber = st.text_input("Rəhbər (Vəzifə və Ad)", placeholder="Məs: Direktor Rəşad Dostuyev")
+    detal = st.text_area("Məzmun", placeholder="Məs: Toyumla bağlı 10 günlük məzuniyyət...")
+    tarix = st.date_input("Tarix", date.today())
     
     hazirla = st.button("✨ Süni İntellektlə Hazırla")
 
 with col2:
     if hazirla and ad and muesise:
-        with st.spinner("AI sənədi hüquqi normalara uyğunlaşdırır..."):
-            # Gemini AI-a göndərilən təlimat (Prompt Engineering)
-            prompt = f"""
-            Sən peşəkar hüquqşünas və kargüzarlıq ekspertisən. 
-            Aşağıdakı məlumatlara əsasən Azərbaycan Respublikasının qanunvericiliyinə uyğun rəsmi {doc_type} mətni hazırla.
-            Mətn rəsmi, ciddi və hüquqi terminlərlə zəngin olmalıdır.
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+            prompt = f"Azərbaycan dilində, rəsmi kargüzarlıq üslubunda {doc_type} üçün əsas mətn hissəsi yaz. Mövzu: {detal}. Şəxs: {ad}, Vəzifə: {vezife}. Yalnız əsas mətni qaytar."
             
-            İstifadəçi məlumatları:
-            Ad: {ad}
-            Vəzifə: {vezife}
-            Müəssisə: {muesise}
-            Rəhbər: {rehber}
-            Məzmun: {detal}
+            response = model.generate_content(prompt)
             
-            Yalnız sənədin əsas mətn hissəsini qaytar.
-            """
-            
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content(prompt)
-                ai_content = response.text
-                
-                st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
-                st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
-                st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
-                st.markdown(f"<br><br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
-                st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{ai_content}</p>", unsafe_allow_html=True)
-                st.markdown("<br><br><br>", unsafe_allow_html=True)
-                st.markdown(f"<p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Xəta baş verdi: {e}")
+            st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
+            st.markdown(f"<br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{response.text}</p>", unsafe_allow_html=True)
+            st.markdown(f"<br><br><p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Sistem xətası: {e}")
     else:
-        st.info("Məlumatları doldurun və AI-ın gücünü görün.")
+        st.info("Məlumatları daxil edin və düyməni sıxın.")
