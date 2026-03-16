@@ -1,16 +1,11 @@
 import streamlit as st
-import google.generativeai as genai
 from datetime import date
+import google.generativeai as genai
 
-# 1. Konfiqurasiya və API Yoxlanışı
+# Səhifə Ayarları
 st.set_page_config(page_title="Qanun-AI - Rəsmi Portal", layout="wide")
 
-if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-else:
-    st.error("XƏTA: API Key 'Secrets' bölməsində tapılmadı!")
-
-# 2. Dizayn (Səliqəli və Rəsmi)
+# CSS - Vizual xətaları aradan qaldırmaq üçün
 st.markdown("""
     <style>
     header, footer, #MainMenu, .stDeployButton {visibility: hidden;}
@@ -28,51 +23,53 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="header-panel"><h1>Qanun-AI</h1><p>Süni İntellektli Rəsmi Sənəd Portalı</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="header-panel"><h1>Qanun-AI</h1><p>Rəsmi Sənəd Hazırlama Portalı</p></div>', unsafe_allow_html=True)
 
-# 3. İnterfeys
+# Şablon Bazası (AI işləməsə belə sayt sənəd hazırlayacaq)
+templates = {
+    "İstifa Ərizəsi": "Xahiş edirəm, tutduğum {vezife} vəzifəsindən öz istəyimlə azad olunmağım barədə müvafiq göstəriş verəsiniz.",
+    "Məzuniyyət Ərizəsi": "Xahiş edirəm, {tarix} tarixdən etibarən mənə növbəti əmək məzuniyyətinin verilməsi barədə sərəncam verəsiniz.",
+    "İzahata": "Məlumat üçün bildirirəm ki, {detal} səbəbindən iş prosesində yaranmış gecikməyə görə izahatımı təqdim edirəm.",
+    "Arayış": "Bu arayış həqiqətən də təsdiq edir ki, {ad} {muesise} müəssisəsində {vezife} vəzifəsində çalışır."
+}
+
 col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
     st.markdown("### **Sənəd Parametrləri**")
-    doc_type = st.selectbox("Sənədin növü", ["İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "İzahata", "Təqdimat", "Müqavilə", "Arayış"])
+    doc_type = st.selectbox("Sənədin növü", list(templates.keys()))
     ad = st.text_input("Tam Adınız", value="Əli Əlizadə")
     vezife = st.text_input("Vəzifəniz", value="Mühəndis")
     muesise = st.text_input("Müəssisə", value="Aztelekom MMC")
     rehber = st.text_input("Rəhbər (Vəzifə və Ad)", value="Direktor Rəşad Dostuyev")
-    detal = st.text_area("Məzmun", placeholder="Məs: Ailə vəziyyəti ilə bağlı 5 günlük ödənişsiz məzuniyyət...")
+    detal = st.text_area("Məzmun / Səbəb", placeholder="Məs: Ailə vəziyyəti ilə bağlı...")
     tarix = st.date_input("Tarix", date.today())
-    hazirla = st.button("✨ Süni İntellektlə Hazırla")
+    hazirla = st.button("✨ Sənədi Hazırla")
 
 with col2:
     if hazirla:
-        if not detal:
-            st.warning("Zəhmət olmasa məzmun hissəsini doldurun.")
-        else:
-            with st.spinner("AI sənədi tərtib edir..."):
-                prompt = f"Azərbaycan dilində, rəsmi kargüzarlıq üslubunda {doc_type} üçün əsas mətn hissəsi yaz. Mövzu: {detal}. Şəxs: {ad}, Vəzifə: {vezife}. Yalnız mətni qaytar."
-                
-                # Model xətalarını keçmək üçün ardıcıl yoxlama (Failover logic)
-                success = False
-                for model_name in ['gemini-1.5-flash', 'gemini-pro', 'models/gemini-1.5-flash-latest']:
-                    try:
-                        model = genai.GenerativeModel(model_name)
-                        response = model.generate_content(prompt)
-                        ai_text = response.text
-                        success = True
-                        break 
-                    except:
-                        continue
-                
-                if success:
-                    st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
-                    st.markdown(f"<br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{ai_text}</p>", unsafe_allow_html=True)
-                    st.markdown(f"<br><br><p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.error("AI Modelləri ilə əlaqə qurula bilmədi. API Key-in statusunu Google AI Studio-da yoxlayın.")
+        # Əvvəlcə şablonu hazırlayaq
+        final_text = templates[doc_type].format(ad=ad, vezife=vezife, muesise=muesise, tarix=tarix, detal=detal)
+        
+        # Əgər API Key varsa, AI ilə zənginləşdirməyə çalışaq
+        if "GOOGLE_API_KEY" in st.secrets:
+            try:
+                genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = f"Azərbaycan dilində rəsmi kargüzarlıq dildində bu mətni daha peşəkar et: {final_text}"
+                response = model.generate_content(prompt)
+                final_text = response.text
+                st.toast("AI tərəfindən təkmilləşdirildi!")
+            except:
+                st.toast("Şablon rejimi aktivdir (AI qoşulmadı).")
+
+        # Sənədi Göstər
+        st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
+        st.markdown(f"<br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{final_text}</p>", unsafe_allow_html=True)
+        st.markdown(f"<br><br><p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Məlumatları daxil edin və 'Hazırla' düyməsini sıxın.")
+        st.info("Məlumatları daxil edin və düyməni sıxın.")
