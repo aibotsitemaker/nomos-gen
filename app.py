@@ -1,6 +1,14 @@
 import streamlit as st
+import google.generativeai as genai
 from datetime import date
 
+# Streamlit Secrets-dən API Key-i götürürük
+try:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+except:
+    st.error("API Key tapılmadı. Secrets bölməsini yoxlayın!")
+
+# Səhifə tənzimləmələri
 st.set_page_config(page_title="Qanun-AI - Universal Generator", layout="wide")
 
 # CSS (Gizli Streamlit elementləri və Rəsmi Stil)
@@ -17,60 +25,63 @@ st.markdown("""
         box-shadow: 0 10px 25px rgba(0,0,0,0.05); min-height: 550px;
         color: black !important; font-family: 'Times New Roman', serif;
     }
-    input, textarea { border: 1px solid #1a2a40 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="header-panel"><h1>Qanun-AI</h1><p>Rəsmi Sənəd və Ərizə Portalı</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="header-panel"><h1>Qanun-AI</h1><p>Süni İntellektli Rəsmi Sənəd Portalı</p></div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
     st.markdown("### **Sənəd Parametrləri**")
     
-    # Sənəd növləri
     doc_type = st.selectbox("Sənədin növü", [
-        "İstifa Ərizəsi", 
-        "Məzuniyyət Ərizəsi", 
-        "Ödənişsiz Məzuniyyət Ərizəsi",
-        "Ezamiyyət Təqdimatı",
-        "İzahata",
-        "Arayış (İş yerindən)",
-        "Xüsusi (Sərbəst mətn)"
+        "İstifa Ərizəsi", "Məzuniyyət Ərizəsi", "Ödənişsiz Məzuniyyət Ərizəsi",
+        "İzahata", "Təqdimat", "Arayış", "Müqavilə", "Xüsusi Sənəd"
     ])
     
     ad = st.text_input("Sizin Tam Adınız")
     vezife = st.text_input("Vəzifəniz")
     muesise = st.text_input("Müəssisə / Şirkət")
     rehber = st.text_input("Rəhbərin Vəzifəsi və Adı")
-    
-    # Detallar hissəsi sənəd növünə görə dəyişir
-    detal = st.text_area("Sənədin qısa məzmunu / Səbəbi", placeholder="Məs: Ailə vəziyyəti ilə bağlı 2 günlük...")
-    
+    detal = st.text_area("Sənədin qısa məzmunu (AI bunu rəsmiləşdirəcək)", placeholder="Məs: Ailə vəziyyəti ilə bağlı 3 günlük icazə...")
     tarix = st.date_input("Sənəd Tarixi", date.today())
-    hazirla = st.button("✨ Rəsmi Sənədi Hazırla")
+    
+    hazirla = st.button("✨ Süni İntellektlə Hazırla")
 
 with col2:
     if hazirla and ad and muesise:
-        # Beyin hissəsi (Hələlik mühəndis şablonları ilə, AI bir saniyəlik məsafədədir)
-        # Sənəd mətnini hazırlayan məntiq
-        if "İstifa" in doc_type:
-            content = f"Xahiş edirəm, {detal if detal else 'öz istəyimlə'} tutduğum {vezife} vəzifəsindən azad olunmağım barədə müvafiq göstəriş verəsiniz."
-        elif "Məzuniyyət" in doc_type:
-            content = f"Xahiş edirəm, {tarix} tarixdən başlayaraq mənə {detal if detal else 'növbəti'} məzuniyyətimin verilməsinə icazə verəsiniz."
-        else:
-            content = f"Məlumat üçün bildirirəm ki, {detal}. Bununla bağlı müvafiq qərar verməyinizi xahiş edirəm."
-
-        st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
-        st.markdown(f"<br><br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{content}</p>", unsafe_allow_html=True)
-        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-        st.markdown(f"<p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Əlavə düymələr
-        st.download_button("📥 Word formatında yüklə", "Test", file_name="sened.doc")
+        with st.spinner("AI sənədi hüquqi normalara uyğunlaşdırır..."):
+            # Gemini AI-a göndərilən təlimat (Prompt Engineering)
+            prompt = f"""
+            Sən peşəkar hüquqşünas və kargüzarlıq ekspertisən. 
+            Aşağıdakı məlumatlara əsasən Azərbaycan Respublikasının qanunvericiliyinə uyğun rəsmi {doc_type} mətni hazırla.
+            Mətn rəsmi, ciddi və hüquqi terminlərlə zəngin olmalıdır.
+            
+            İstifadəçi məlumatları:
+            Ad: {ad}
+            Vəzifə: {vezife}
+            Müəssisə: {muesise}
+            Rəhbər: {rehber}
+            Məzmun: {detal}
+            
+            Yalnız sənədin əsas mətn hissəsini qaytar.
+            """
+            
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(prompt)
+                ai_content = response.text
+                
+                st.markdown('<div class="paper-preview">', unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align:right;'><b>{muesise} {rehber}nə</b></p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align:right;'>{vezife} {ad} tərəfindən</p>", unsafe_allow_html=True)
+                st.markdown(f"<br><br><h3 style='text-align:center;'>{doc_type.upper()}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-indent:50px; text-align:justify;'>{ai_content}</p>", unsafe_allow_html=True)
+                st.markdown("<br><br><br>", unsafe_allow_html=True)
+                st.markdown(f"<p style='display:flex; justify-content:space-between;'><span>Tarix: {tarix}</span><span>İmza: ________________</span></p>", unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Xəta baş verdi: {e}")
     else:
-        st.markdown('<div class="paper-preview" style="display:flex; align-items:center; justify-content:center; opacity:0.3; text-align:center;"><h3>Məlumatları daxil edin və sənədi yaradın</h3></div>', unsafe_allow_html=True)
+        st.info("Məlumatları doldurun və AI-ın gücünü görün.")
